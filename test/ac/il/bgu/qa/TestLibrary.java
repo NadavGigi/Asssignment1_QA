@@ -4,6 +4,8 @@ import ac.il.bgu.qa.services.NotificationService;
 import org.junit.jupiter.api.*;
 
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Random;
 import ac.il.bgu.qa.services.DatabaseService;
 import ac.il.bgu.qa.services.ReviewService;
@@ -514,14 +516,176 @@ class TestLibrary {
         when(mockDatabaseService.getBookByISBN(isbn1)).thenThrow(new RuntimeException("Database error"));
         assertThrows(RuntimeException.class, () -> library.getBookByISBN(isbn1, "123456789012"),"Database error");
     }
-//    @Test
-//    void givenValidISBNAndValidUserId_whenGetBookByISBN_thenNotifyUser() {
-//        library.getBookByISBN(isbn1, id1);
-//        Library spyLib=spy(library);
-//        d.when(spyLib).notifyUserWithBookReviews(isbn1, id1);
-//
-//        verify(library, times(1)).notifyUserWithBookReviews(isbn1, id1);
-//    }
+    @Test
+    void givenValidISBNAndValidUserIdNoNotifation_whenGetBookByISBN_thenGoodBookReturned() {
+        assertSame(book1,library.getBookByISBN(isbn1,id1));
+    }
+    @Test
+    void givenInValidISBNAndValidUserId_whenGetBookByISBN_thenThrows() {
+        isbn1="blalbla";
+        assertThrows(IllegalArgumentException.class,()->library.getBookByISBN(isbn1, id1),"Invalid ISBN.");
+        verify(mockDatabaseService,never()).getBookByISBN(anyString());
+    }
+    @Test
+    void givenValidISBNAndInValidUserId_whenGetBookByISBN_thenThrows() {
+        id1="blalbla";
+        assertThrows(IllegalArgumentException.class,()->library.getBookByISBN(isbn1, id1),"Invalid user Id.");
+        verify(mockDatabaseService,never()).getBookByISBN(anyString());
+    }
+    @Test
+    void givenValidISBNAndNullUserId_whenGetBookByISBN_thenThrows() {
+        id1=null;
+        assertThrows(IllegalArgumentException.class,()->library.getBookByISBN(isbn1, id1),"Invalid user Id.");
+        verify(mockDatabaseService,never()).getBookByISBN(anyString());
+    }
+    @Test
+    void givenValidISBNAndValidUserIdInvalidDatabase_whenGetBookByISBN_thenThrows() {
+        when(mockDatabaseService.getBookByISBN(isbn1)).thenThrow(new IllegalArgumentException("Database down."));
+        assertThrows(IllegalArgumentException.class,()->library.getBookByISBN(isbn1, id1),"Database down.");
+    }
+    @Test
+    void givenValidISBNAndValidUserButNoBook_whenGetBookByISBN_thenThrows() {
+        when(mockDatabaseService.getBookByISBN(isbn1)).thenReturn(null);
+
+        assertThrows(BookNotFoundException.class,()->library.getBookByISBN(isbn1, id1),"Book not found!");
+    }
+    @Test
+    void givenValidISBNAndValidUserBookBorrowed_whenGetBookByISBN_thenThrows() {
+        book1.borrow();
+        assertThrows(BookAlreadyBorrowedException.class,()->library.getBookByISBN(isbn1, id1),"Book was already borrowed!");
+    }
+    @Test
+    void givenValidISBNAndValidUserNotfiIsDown_whenGetBookByISBN_thenWorksFine() {
+        Library spyLib=spy(library);
+        doThrow(new IllegalArgumentException("Testing")).when(spyLib).notifyUserWithBookReviews(anyString(),anyString());
+        assertSame(book1,library.getBookByISBN(isbn1,id1));
+    }
+
+    //endregion
+
+    //region notifyUserWithBookReviews
+    @Test
+    void givenValidISBNAndInValidUser_whenNotifyUserWithBookReviews_thenThrows() {
+        id1="blalbla5";
+        assertThrows(IllegalArgumentException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"Invalid user Id.");
+    }
+    @Test
+    void givenValidISBNAndnullUser_whenNotifyUserWithBookReviews_thenThrows() {
+        id1=null;
+        assertThrows(IllegalArgumentException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"Invalid user Id.");
+    }
+    @Test
+    void givenInvalidISBNAndInValidUser_whenNotifyUserWithBookReviews_thenThrows() {
+        isbn1="fsfsfs";
+        assertThrows(IllegalArgumentException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"Invalid ISBN.");
+    }
+    @Test
+    void givenInvalidISBNAndnulldUser_whenNotifyUserWithBookReviews_thenThrows() {
+        isbn1=null;
+        assertThrows(IllegalArgumentException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"Invalid ISBN.");
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserBrokenDatabase_whenNotifyUserWithBookReviews_thenThrows() {
+        when(mockDatabaseService.getBookByISBN(isbn1)).thenThrow(new IllegalArgumentException("Database down."));
+        assertThrows(IllegalArgumentException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"Database down.");
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserDatabaseReturnBookNUll_whenNotifyUserWithBookReviews_thenThrows() {
+        when(mockDatabaseService.getBookByISBN(isbn1)).thenReturn(null);
+        assertThrows(BookNotFoundException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"Book not found!");
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserDatabaseReturnUserNUll_whenNotifyUserWithBookReviews_thenThrows() {
+        when(mockDatabaseService.getUserById(id1)).thenReturn(null);
+        assertThrows(UserNotRegisteredException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"User not found!");
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserDatabaseBreak_whenNotifyUserWithBookReviews_thenThrows() {
+        when(mockDatabaseService.getUserById(id1)).thenThrow(new IllegalArgumentException("Database down."));
+        assertThrows(IllegalArgumentException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"Database down.");
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserDatabaseBreakInReviews_whenNotifyUserWithBookReviews_thenThrows() {
+        when(mockReviewService.getReviewsForBook(isbn1)).thenThrow(new ReviewException("for testing."));
+        assertThrows(ReviewServiceUnavailableException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"Review service unavailable!");
+        verify(mockReviewService,times(1)).close();
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserDatabaseBreakInReviews2_whenNotifyUserWithBookReviews_thenThrows() {
+        when(mockReviewService.getReviewsForBook(isbn1)).thenThrow(new IllegalArgumentException("for testing."));
+        assertThrows(IllegalArgumentException.class,()->library.notifyUserWithBookReviews(isbn1, id1),"for testing.");
+        verify(mockReviewService,times(1)).close();
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserDatabaseBreakInReviews3_whenNotifyUserWithBookReviews_thenThrows() {
+        when(mockReviewService.getReviewsForBook(isbn1)).thenReturn(new ArrayList<>());
+        assertThrows(NoReviewsFoundException.class,()->library.notifyUserWithBookReviews(isbn1, id1));
+        verify(mockReviewService,times(1)).close();
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserDatabaseBreakInReviews4_whenNotifyUserWithBookReviews_thenThrows() {
+        when(mockReviewService.getReviewsForBook(isbn1)).thenReturn(null);
+        assertThrows(NoReviewsFoundException.class,()->library.notifyUserWithBookReviews(isbn1, id1));
+        verify(mockReviewService,times(1)).close();
+    }
+    @Test
+    void givenInvalidISBNAndValiddUser_whenNotifyUserWithBookReviews_thenSucces() {
+        ArrayList<String> reviews= new ArrayList<>(Arrays.asList("abasdas", "fsfsfs"));
+        String notificationMessage = "Reviews for '" + book1.getTitle() + "':\n" + String.join("\n", reviews);
+        when(mockReviewService.getReviewsForBook(isbn1)).thenReturn(reviews);
+        User mockUser=mock(User.class);
+        when(mockDatabaseService.getUserById(id1)).thenReturn(mockUser);
+        library.notifyUserWithBookReviews(isbn1,id1);
+        verify(mockReviewService,times(1)).close();
+        verify(mockUser,times(1)).sendNotification(notificationMessage);
+
+    }
+    @Test
+    void givenInvalidISBNAndValiddUserInvalidSendNotification_whenNotifyUserWithBookReviews_thenSucces() {
+        ArrayList<String> reviews= new ArrayList<>(Arrays.asList("abasdas", "fsfsfs"));
+        String notificationMessage = "Reviews for '" + book1.getTitle() + "':\n" + String.join("\n", reviews);
+        when(mockReviewService.getReviewsForBook(isbn1)).thenReturn(reviews);
+        User mockUser=mock(User.class);
+        when(mockDatabaseService.getUserById(id1)).thenReturn(mockUser);
+        library.notifyUserWithBookReviews(isbn1,id1);
+        verify(mockReviewService,times(1)).close();
+        verify(mockUser,times(1)).sendNotification(notificationMessage);
+
+    }
+    @Test
+    void givenValidUserValidBook_whenNotifyUserWithBookReviewsSendNotificationDontWorkMoreThen5Times_throws3() {
+        when(mockDatabaseService.getUserById("102030405060")).thenReturn(null);
+        when(mockDatabaseService.getBookByISBN("9780140449266")).thenReturn(new Book("9780140449266", "title", "author"));
+
+        UserNotRegisteredException userNotRegisteredException =
+                assertThrows(UserNotRegisteredException.class, () -> library.notifyUserWithBookReviews("9780140449266", "102030405060"));
+        assertEquals(userNotRegisteredException.getMessage(), "User not found!");
+    }
+    @Test
+    void givenValidUserValidBook_whenNotifyUserWithBookReviewsSendNotificationDontWorkMoreThen5Times_throws2() {
+        when(mockReviewService.getReviewsForBook(isbn1)).thenThrow(new ReviewException("error"));
+
+        ReviewServiceUnavailableException reviewServiceUnavailableException =
+                assertThrows(ReviewServiceUnavailableException.class, () -> library.notifyUserWithBookReviews(isbn1, id1));
+        assertEquals(reviewServiceUnavailableException.getMessage(), "Review service unavailable!");
+    }
+    @Test
+    void givenValidUserValidBook_whenNotifyUserWithBookReviewsSendNotificationDontWorkMoreThen5Times_throws() {
+        String id=generateID();
+        String isbn=generateIsbn();
+        Book book = new Book(isbn, "TitleTest", "AuthorTest");
+        User user = Mockito.spy(new User("guy", id, mockNotificationService));
+
+        doThrow(new NotificationException("error message")).when(user).sendNotification(anyString());
+        when(mockDatabaseService.getBookByISBN(isbn)).thenReturn(book);
+        when(mockDatabaseService.getUserById(id)).thenReturn(user);
+        when(mockReviewService.getReviewsForBook(isbn)).thenReturn(Arrays.asList("Review 1", "Review 2"));
+
+        NotificationException exception = assertThrows(NotificationException.class, () -> library.notifyUserWithBookReviews(isbn, id));
+        assertEquals(exception.getMessage(), "Notification failed!");
+        verify(user, times(5)).sendNotification(anyString());
+    }
+
     //endregion
 
     //region private methoods
