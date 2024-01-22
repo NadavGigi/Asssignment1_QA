@@ -3,7 +3,7 @@ import ac.il.bgu.qa.errors.*;
 import ac.il.bgu.qa.services.NotificationService;
 import org.junit.jupiter.api.*;
 
-import java.security.SecureRandom;
+
 import java.util.Random;
 import ac.il.bgu.qa.services.DatabaseService;
 import ac.il.bgu.qa.services.ReviewService;
@@ -550,8 +550,8 @@ class TestLibrary {
             sum += (i % 2 == 0) ? digit : digit * 3;
         }
 
-        int checkDigit = (10 - (sum % 10)) % 10;
-        return checkDigit;
+
+        return (10 - (sum % 10)) % 10;
     }
     private static String generateID() {
         Random random = new Random();
